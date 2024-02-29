@@ -341,8 +341,12 @@ func outputRunDetails(maxThreads int, results []benchResult, overhead bool, lega
 			fmt.Fprintf(w, "\n%s\n\n", res.driverInfo)
 
 			fmt.Fprintf(w, "Bench / driver / threads\tMin\tMax\tAvg\tMin\tMax\tAvg\tMem %%\tCPU x\t\n")
+			var size = res.threads
+			if !legacyMode {
+				size = 1
+			}
 
-			for j := 0; j < res.threads; j++ {
+			for j := 0; j < size; j++ {
 				m := metrics[i][j]
 
 				fmt.Fprintf(w,
@@ -597,3 +601,4 @@ func init() {
 	runCmd.PersistentFlags().BoolVarP(&overhead, "overhead", "o", false, "Output daemon overhead")
 	runCmd.PersistentFlags().BoolVarP(&legacy, "legacy", "l", false, "legacy mode will run benchmark from 1 to N(thread number) iterations.")
 }
+

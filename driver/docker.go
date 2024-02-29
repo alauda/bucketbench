@@ -14,6 +14,8 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	docker "github.com/docker/docker/client"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -157,7 +159,31 @@ func (d *DockerDriver) Run(ctx context.Context, ctr Container) (string, time.Dur
 		return "", 0, errors.Wrapf(err, "failed to start container '%s'", ctr.Name())
 	}
 
-	return "", time.Since(start), nil
+	duration := time.Since(start)
+
+	if sleep, ok := ctx.Value("sleep").(int64); ok {
+		time.Sleep(time.Duration(sleep) * time.Second)
+	}
+
+	/*// wait container status to running
+	newCtx, cancel := context.WithTimeout(ctx, time.Second*100)
+	defer cancel()
+	err := wait.PollUntilWithContext(newCtx, time.Microsecond*10, func(ctx context.Context) (done bool, err error) {
+		status, err := d.client.ContainerInspect(newCtx, ctr.Name())
+		if err != nil {
+			return true, err
+		}
+		if status.ContainerJSONBase != nil && status.ContainerJSONBase.State.Running {
+			return true, nil
+		}
+		log.Debugf("container %s is not running. state: %v", ctr.Name(), status.ContainerJSONBase.State)
+		return false, nil
+	})
+
+	if err != nil {
+		return "", 0, err
+	}*/
+	return "", duration, nil
 }
 
 // Stop stops a container
@@ -190,11 +216,30 @@ func (d *DockerDriver) Remove(ctx context.Context, ctr Container) (string, time.
 // Pause pauses a container
 func (d *DockerDriver) Pause(ctx context.Context, ctr Container) (string, time.Duration, error) {
 	start := time.Now()
-
-	if err := d.client.ContainerPause(ctx, ctr.Name()); err != nil {
-		return "", 0, nil
+	// sleep one second before pause a container
+	time.Sleep(time.Second)
+	newCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+	err := wait.PollUntilWithContext(newCtx, time.Microsecond*10, func(ctx context.Context) (done bool, err error) {
+		status, err := d.client.ContainerInspect(newCtx, ctr.Name())
+		if err != nil {
+			return true, err
+		}
+		if status.ContainerJSONBase != nil && status.ContainerJSONBase.State.Paused {
+			return true, nil
+		} else if status.ContainerJSONBase == nil || !status.ContainerJSONBase.State.Running {
+			log.Debugf("failed to pause container %s, state: %+v", ctr.Name(), status.ContainerJSONBase.State)
+			return false, nil
+		}
+		if err = d.client.ContainerPause(newCtx, ctr.Name()); err != nil {
+			log.Debugf("failed to pause container %s, state: %+v, err: %+v", ctr.Name(), status.ContainerJSONBase.State, err)
+			return false, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return "", 0, err
 	}
-
 	return "", time.Since(start), nil
 }
 
@@ -282,3 +327,4 @@ func getDockerPID(path string) (int, error) {
 
 	return strconv.Atoi(string(buf))
 }
+

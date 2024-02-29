@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -159,8 +160,15 @@ func (cb *CustomBench) runThread(ctx context.Context, runner driver.Driver, thre
 
 		for _, cmd := range commands {
 			log.Debugf("running command: %s", cmd)
-			switch strings.ToLower(cmd) {
+			key := strings.Split(strings.ToLower(cmd), " ")[0]
+			switch strings.ToLower(key) {
 			case "run", "start":
+				items := strings.Split(strings.ToLower(cmd), " ")
+				if len(items) > 1 {
+					if value, err := strconv.ParseInt(items[1], 10, 64); err == nil {
+						ctx = context.WithValue(ctx, "sleep", value)
+					}
+				}
 				out, runElapsed, err := runner.Run(ctx, ctr)
 				if err != nil {
 					errors["run"]++
@@ -263,3 +271,4 @@ func (cb *CustomBench) Type() Type {
 func (cb *CustomBench) Info(ctx context.Context) (string, error) {
 	return cb.driver.Info(ctx)
 }
+
