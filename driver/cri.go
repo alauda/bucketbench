@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	defaultPodImage        = "k8s.gcr.io/pause:3.1"
+	defaultPodImage        = "registry.aliyuncs.com/google_containers/pause:3.1"
 	defaultPodNamePrefix   = "pod"
 	defaultSandboxConfig   = "contrib/sandbox_config.json"
 	defaultContainerConfig = "contrib/container_config.json"
@@ -30,11 +30,13 @@ var (
 // CRIDriver is an implementation of the driver interface for using k8s Container Runtime Interface.
 // This uses the provided client library which abstracts using the gRPC APIs directly.
 type CRIDriver struct {
-	criSocketAddress string
-	runtimeClient    *pb.RuntimeServiceClient
-	imageClient      *pb.ImageServiceClient
-	pconfig          pb.PodSandboxConfig
-	cconfig          pb.ContainerConfig
+	criSocketAddress   string
+	runtimeClient      *pb.RuntimeServiceClient
+	imageClient        *pb.ImageServiceClient
+	pconfig            pb.PodSandboxConfig
+	cconfig            pb.ContainerConfig
+	runtimePidFilePath string
+	runtimeType        string
 }
 
 // CRIContainer is an implementation of the container metadata needed for CRI implementation
@@ -48,8 +50,14 @@ type CRIContainer struct {
 	podID       string
 }
 
+// CRIExtendedConfig represents the CRI-specific configuration
+type CRIExtendedConfig struct {
+	RuntimeType        string `json:"runtimeType"`
+	RuntimePidFilePath string `json:"runtimePidFilePath"`
+}
+
 // NewCRIDriver creates an instance of the CRI driver
-func NewCRIDriver(path string) (Driver, error) {
+func NewCRIDriver(ctx context.Context, path string) (Driver, error) {
 	if path == "" {
 		return nil, fmt.Errorf("socket path unspecified")
 	}
@@ -78,6 +86,14 @@ func NewCRIDriver(path string) (Driver, error) {
 		imageClient:      &imageClient,
 		cconfig:          cconfig,
 		pconfig:          pconfig,
+	}
+
+	if extended, ok := ctx.Value("extended").(CRIExtendedConfig); ok {
+		driver.runtimeType = extended.RuntimeType
+		if extended.RuntimeType == "docker" && extended.RuntimePidFilePath == "" {
+			driver.runtimePidFilePath = dockerDefaultPIDPath
+		}
+		driver.runtimePidFilePath = extended.RuntimePidFilePath
 	}
 
 	return driver, nil
@@ -316,6 +332,9 @@ func (c *CRIDriver) Close() error {
 
 // PID returns daemon process id
 func (c *CRIDriver) PID() (int, error) {
+	if c.runtimeType == "docker" {
+		return getDockerPID(c.runtimePidFilePath)
+	}
 	return 0, errors.New("not implemented")
 }
 

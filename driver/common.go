@@ -142,7 +142,7 @@ func New(ctx context.Context, config *Config) (Driver, error) {
 	case Ctr:
 		return NewCtrDriver(config.Path)
 	case CRI:
-		return NewCRIDriver(config.Path)
+		return NewCRIDriver(ctx, config.Path)
 	case Null:
 		return nil, nil
 	default:
