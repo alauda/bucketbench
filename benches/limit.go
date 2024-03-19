@@ -33,7 +33,7 @@ func (lb *LimitBench) Validate(ctx context.Context) error {
 
 // Run executes the benchmark iterations against a specific engine driver type
 // for a specified number of iterations
-func (lb *LimitBench) Run(ctx context.Context, threads, iterations int, commands []string) error {
+func (lb *LimitBench) Run(ctx context.Context, threads, iterations int, duration time.Duration, commands []string) error {
 	log.Infof("Start LimitBench run: threads (%d); iterations (%d)", threads, iterations)
 	statChan := make([]chan RunStatistics, threads)
 	for i := range statChan {
@@ -43,7 +43,7 @@ func (lb *LimitBench) Run(ctx context.Context, threads, iterations int, commands
 	start := time.Now()
 	for i := 0; i < threads; i++ {
 		lb.wg.Add(1)
-		go lb.runThread(ctx, iterations, statChan[i])
+		go lb.runThread(ctx, iterations, duration, statChan[i])
 	}
 	lb.wg.Wait()
 	lb.elapsed = time.Since(start)
@@ -59,8 +59,12 @@ func (lb *LimitBench) Run(ctx context.Context, threads, iterations int, commands
 	return nil
 }
 
-func (lb *LimitBench) runThread(ctx context.Context, iterations int, stats chan RunStatistics) {
+func (lb *LimitBench) runThread(ctx context.Context, iterations int, duration time.Duration, stats chan RunStatistics) {
+	timeStart := time.Now()
 	for i := 0; i < iterations; i++ {
+		if duration > 0 && time.Now().Sub(timeStart) >= duration {
+			break
+		}
 		_, elapsed, _ := utils.ExecTimedCmd(ctx, "ls", "/tmp")
 		stats <- RunStatistics{
 			Durations: map[string]time.Duration{"run": elapsed},

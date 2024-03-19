@@ -53,7 +53,7 @@ type CRIContainer struct {
 // CRIExtendedConfig represents the CRI-specific configuration
 type CRIExtendedConfig struct {
 	RuntimeType        string `json:"runtimeType"`
-	RuntimePidFilePath string `json:"runtimePidFilePath"`
+	RuntimePidFilePath string `json:"runtimePidFilePath,omitempty"`
 }
 
 // NewCRIDriver creates an instance of the CRI driver
@@ -88,12 +88,21 @@ func NewCRIDriver(ctx context.Context, path string) (Driver, error) {
 		pconfig:          pconfig,
 	}
 
-	if extended, ok := ctx.Value("extended").(CRIExtendedConfig); ok {
+	if value := ctx.Value("extended"); value != nil {
+		bytes, err := json.Marshal(value)
+		if err != nil {
+			return nil, err
+		}
+		extended := CRIExtendedConfig{}
+		if err = json.Unmarshal(bytes, &extended); err != nil {
+			return nil, err
+		}
 		driver.runtimeType = extended.RuntimeType
 		if extended.RuntimeType == "docker" && extended.RuntimePidFilePath == "" {
 			driver.runtimePidFilePath = dockerDefaultPIDPath
 		}
 		driver.runtimePidFilePath = extended.RuntimePidFilePath
+
 	}
 
 	return driver, nil

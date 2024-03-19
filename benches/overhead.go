@@ -21,7 +21,7 @@ type OverheadBench struct {
 
 // Run executes the benchmark iterations against a specific engine driver type
 // for a specified number of iterations
-func (b *OverheadBench) Run(ctx context.Context, threads, iterations int, commands []string) error {
+func (b *OverheadBench) Run(ctx context.Context, threads, iterations int, duration time.Duration, commands []string) error {
 	sampler, err := stats.NewSampler(b.driver, b.cgroupPath)
 	if err != nil {
 		log.WithError(err).Error("failed to create stats sampler")
@@ -48,7 +48,7 @@ func (b *OverheadBench) Run(ctx context.Context, threads, iterations int, comman
 		}
 	}()
 
-	err = b.CustomBench.Run(ctx, threads, iterations, commands)
+	err = b.CustomBench.Run(ctx, threads, iterations, duration, commands)
 
 	// Stop gathering metrics
 	ticker.Stop()

@@ -150,7 +150,7 @@ func runLimitTest(ctx context.Context) []float64 {
 	for i := 1; i <= defaultLimitThreads; i++ {
 		limit, _ := benches.New(benches.Limit, &benches.DriverConfig{})
 		limit.Init(ctx, "", driver.Null, "", "", "", trace)
-		limit.Run(ctx, i, defaultLimitIter, nil)
+		limit.Run(ctx, i, defaultLimitIter, 0, nil)
 		duration := limit.Elapsed()
 		rate := float64(i*defaultLimitIter) / duration.Seconds()
 		rates = append(rates, rate)
@@ -166,6 +166,10 @@ func runBenchmark(ctx context.Context, benchType benches.Type, driverConfig benc
 		benchInfo  string
 		driverInfo string
 	)
+
+	if driverConfig.Extended != nil {
+		ctx = context.WithValue(ctx, "extended", driverConfig.Extended)
+	}
 
 	if legacyMode {
 		stats = make([][]benches.RunStatistics, driverConfig.Threads)
@@ -239,7 +243,7 @@ func runBenchmarkOnce(ctx context.Context, benchType benches.Type, driverConfig 
 
 	driverInfo := info
 
-	err = bench.Run(ctx, threads, driverConfig.Iterations, benchmark.Commands)
+	err = bench.Run(ctx, threads, driverConfig.Iterations, driverConfig.Duration, benchmark.Commands)
 	if err != nil {
 		return benchSingleResult{}, fmt.Errorf("error during bench run: %v", err)
 	}
@@ -377,25 +381,43 @@ func outputRunDetails(maxThreads int, results []benchResult, overhead bool, lega
 
 func outputDetailCommandStatsLegacy(result benchResult, w *tabwriter.Writer, cmdList []string) {
 	for i := 0; i < result.threads; i++ {
-		fmt.Fprintf(w, "%s:%d\tMin\tMax\tAvg\tMedian\tStddev\tErrors\t\n", result.name, i+1)
+		fmt.Fprintf(w, "%s:%d\tMin\tMax\tAvg\tMedian\tStddev\tErrors\tCancelled\tRate\t\n", result.name, i+1)
 		cmdTimings := parseStats(result.statistics[i])
+		nums := 0
+		for _, stat := range result.statistics[i] {
+			if stat.Daemon == nil {
+				nums += 1
+			}
+		}
 		// given we are working with a map, but we want consistent ordering in the output
 		// we walk a slice of commands in a natural/expected order and output stats for
 		// those that were used during the specific run
 		for _, cmd := range cmdList {
 			if stats, ok := cmdTimings[cmd]; ok {
-				fmt.Fprintf(w, "%s\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%d\t\n", cmd, stats.min, stats.max, stats.avg, stats.median, stats.stddev, stats.errors)
+				fmt.Fprintf(w, "%s\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%d\t%d/%d\t%.2f\t\n", cmd, stats.min, stats.max, stats.avg, stats.median, stats.stddev, stats.errors,
+					result.threads*result.iterations-nums, result.threads*result.iterations,
+					((float64)(nums-stats.errors)/float64(result.threads*result.iterations))*100)
+				log.Infof("len(result.statistics[0]): %v, result.threads: %v, stats.errors: %v, result.iterations: %v\n", cap(result.statistics[i]), result.threads, stats.errors, result.iterations)
 			}
 		}
 	}
 }
 
 func outputDetailCommandStats(result benchResult, w *tabwriter.Writer, cmdList []string) {
-	fmt.Fprintf(w, "%s:%d\tMin\tMax\tAvg\tMedian\tStddev\tErrors\t\n", result.name, result.threads)
+	fmt.Fprintf(w, "%s:%d\tMin\tMax\tAvg\tMedian\tStddev\tErrors\tCancelled\tRate\t\n", result.name, result.threads)
 	cmdTimings := parseStats(result.statistics[0])
+	nums := 0
+	for _, stat := range result.statistics[0] {
+		if stat.Daemon == nil {
+			nums += 1
+		}
+	}
 	for _, cmd := range cmdList {
 		if stats, ok := cmdTimings[cmd]; ok {
-			fmt.Fprintf(w, "%s\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%d\t\n", cmd, stats.min, stats.max, stats.avg, stats.median, stats.stddev, stats.errors)
+			fmt.Fprintf(w, "%s\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%d\t%d/%d\t%.2f\t\n", cmd, stats.min, stats.max, stats.avg, stats.median, stats.stddev, stats.errors,
+				result.threads*result.iterations-nums, result.threads*result.iterations,
+				((float64)(nums-stats.errors)/float64(result.threads*result.iterations))*100)
+			log.Infof("nums: %v, result.threads: %v, stats.errors: %v, result.iterations: %v\n", nums, result.threads, stats.errors, result.iterations)
 		}
 	}
 }
@@ -601,4 +623,3 @@ func init() {
 	runCmd.PersistentFlags().BoolVarP(&overhead, "overhead", "o", false, "Output daemon overhead")
 	runCmd.PersistentFlags().BoolVarP(&legacy, "legacy", "l", false, "legacy mode will run benchmark from 1 to N(thread number) iterations.")
 }
-

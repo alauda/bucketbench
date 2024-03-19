@@ -93,7 +93,7 @@ func (cb *CustomBench) Validate(ctx context.Context) error {
 
 // Run executes the benchmark iterations against a specific engine driver type
 // for a specified number of iterations
-func (cb *CustomBench) Run(ctx context.Context, threads, iterations int, commands []string) error {
+func (cb *CustomBench) Run(ctx context.Context, threads, iterations int, duration time.Duration, commands []string) error {
 	log.Infof("Start CustomBench run: threads (%d); iterations (%d)", threads, iterations)
 	statChan := make([]chan RunStatistics, threads)
 	for i := range statChan {
@@ -114,7 +114,7 @@ func (cb *CustomBench) Run(ctx context.Context, threads, iterations int, command
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			cb.runThread(ctx, drv, index, iterations, commands, statChan[index])
+			cb.runThread(ctx, drv, duration, index, iterations, commands, statChan[index])
 		}(i)
 	}
 	wg.Wait()
@@ -135,15 +135,20 @@ func (cb *CustomBench) Run(ctx context.Context, threads, iterations int, command
 	return nil
 }
 
-func (cb *CustomBench) runThread(ctx context.Context, runner driver.Driver, threadNum, iterations int, commands []string, stats chan RunStatistics) {
+func (cb *CustomBench) runThread(ctx context.Context, runner driver.Driver, duration time.Duration, threadNum, iterations int, commands []string, stats chan RunStatistics) {
 	defer func() {
 		if err := runner.Close(); err != nil {
 			log.Errorf("error on closing driver: %v", err)
 		}
 		close(stats)
 	}()
-
+	timeStart := time.Now()
 	for i := 0; i < iterations; i++ {
+		// 如果 duration 内还没有执行完，则剩下的 Iterations 不再执行
+		if duration > 0 && time.Now().Sub(timeStart) >= duration {
+			break
+		}
+
 		errors := make(map[string]int)
 		durations := make(map[string]time.Duration)
 		// commands are specified in the passed in array; we will need
@@ -271,4 +276,3 @@ func (cb *CustomBench) Type() Type {
 func (cb *CustomBench) Info(ctx context.Context) (string, error) {
 	return cb.driver.Info(ctx)
 }
-
