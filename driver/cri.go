@@ -22,11 +22,6 @@ const (
 	defaultContainerConfig = "contrib/container_config.json"
 )
 
-var (
-	pconfigGlobal pb.PodSandboxConfig
-	cconfigGlobal pb.ContainerConfig
-)
-
 // CRIDriver is an implementation of the driver interface for using k8s Container Runtime Interface.
 // This uses the provided client library which abstracts using the gRPC APIs directly.
 type CRIDriver struct {
@@ -98,11 +93,10 @@ func NewCRIDriver(ctx context.Context, path string) (Driver, error) {
 			return nil, err
 		}
 		driver.runtimeType = extended.RuntimeType
+		driver.runtimePidFilePath = extended.RuntimePidFilePath
 		if extended.RuntimeType == "docker" && extended.RuntimePidFilePath == "" {
 			driver.runtimePidFilePath = dockerDefaultPIDPath
 		}
-		driver.runtimePidFilePath = extended.RuntimePidFilePath
-
 	}
 
 	return driver, nil
@@ -195,7 +189,7 @@ func (c *CRIDriver) Create(ctx context.Context, name, image, cmdOverride string,
 	}
 
 	var pconfig pb.PodSandboxConfig
-	err := deepCopy(&pconfig, pconfigGlobal)
+	err := deepCopy(&pconfig, c.pconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -248,11 +242,11 @@ func (c CRIDriver) Clean(ctx context.Context) error {
 func (c *CRIDriver) Run(ctx context.Context, ctr Container) (string, time.Duration, error) {
 	var pconfig pb.PodSandboxConfig
 	var cconfig pb.ContainerConfig
-	err := deepCopy(&pconfig, pconfigGlobal)
+	err := deepCopy(&pconfig, c.pconfig)
 	if err != nil {
 		return "", 0, err
 	}
-	err = deepCopy(&cconfig, cconfigGlobal)
+	err = deepCopy(&cconfig, c.cconfig)
 	if err != nil {
 		return "", 0, err
 	}
@@ -374,6 +368,7 @@ func openFile(path string) (*os.File, error) {
 }
 
 func loadPodSandboxConfig(path string) (pb.PodSandboxConfig, error) {
+	var pconfigGlobal pb.PodSandboxConfig
 	f, err := openFile(path)
 	if err != nil {
 		return pb.PodSandboxConfig{}, err
@@ -387,6 +382,7 @@ func loadPodSandboxConfig(path string) (pb.PodSandboxConfig, error) {
 }
 
 func loadContainerConfig(path string) (pb.ContainerConfig, error) {
+	var cconfigGlobal pb.ContainerConfig
 	f, err := openFile(path)
 	if err != nil {
 		return pb.ContainerConfig{}, err

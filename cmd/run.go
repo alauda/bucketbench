@@ -397,7 +397,6 @@ func outputDetailCommandStatsLegacy(result benchResult, w *tabwriter.Writer, cmd
 				fmt.Fprintf(w, "%s\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%d\t%d/%d\t%.2f\t\n", cmd, stats.min, stats.max, stats.avg, stats.median, stats.stddev, stats.errors,
 					result.threads*result.iterations-nums, result.threads*result.iterations,
 					((float64)(nums-stats.errors)/float64(result.threads*result.iterations))*100)
-				log.Infof("len(result.statistics[0]): %v, result.threads: %v, stats.errors: %v, result.iterations: %v\n", cap(result.statistics[i]), result.threads, stats.errors, result.iterations)
 			}
 		}
 	}
@@ -417,7 +416,6 @@ func outputDetailCommandStats(result benchResult, w *tabwriter.Writer, cmdList [
 			fmt.Fprintf(w, "%s\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%6.2f\t%d\t%d/%d\t%.2f\t\n", cmd, stats.min, stats.max, stats.avg, stats.median, stats.stddev, stats.errors,
 				result.threads*result.iterations-nums, result.threads*result.iterations,
 				((float64)(nums-stats.errors)/float64(result.threads*result.iterations))*100)
-			log.Infof("nums: %v, result.threads: %v, stats.errors: %v, result.iterations: %v\n", nums, result.threads, stats.errors, result.iterations)
 		}
 	}
 }

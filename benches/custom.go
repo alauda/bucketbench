@@ -143,9 +143,12 @@ func (cb *CustomBench) runThread(ctx context.Context, runner driver.Driver, dura
 		close(stats)
 	}()
 	timeStart := time.Now()
+	log.Infof("runThread start. time: %v, threadNum: %d, iterations: %d", time.Now().String(), threadNum, iterations)
 	for i := 0; i < iterations; i++ {
+		log.Infof("runThread-%d. time: %v, threadNum: %d, iterations: %d", i, time.Now().String(), threadNum, iterations)
 		// 如果 duration 内还没有执行完，则剩下的 Iterations 不再执行
 		if duration > 0 && time.Now().Sub(timeStart) >= duration {
+			log.Infof("runThread end. time: %v, threadNum: %d, iterations: %d, finished: %d, time cost: %.2f", time.Now().String(), threadNum, iterations, i, time.Now().Sub(timeStart).Seconds())
 			break
 		}
 
@@ -153,11 +156,11 @@ func (cb *CustomBench) runThread(ctx context.Context, runner driver.Driver, dura
 		durations := make(map[string]time.Duration)
 		// commands are specified in the passed in array; we will need
 		// a container for each set of commands:
-		name := fmt.Sprintf("%s-%d-%d", driver.ContainerNamePrefix, threadNum, i)
+		name := fmt.Sprintf("%s-%d-%d-%d", driver.ContainerNamePrefix, threadNum, i, time.Now().UnixMilli())
 		ctr, err := runner.Create(ctx, name, cb.imageInfo, cb.cmdOverride, true, cb.trace)
 		if err != nil {
 			log.Errorf("Error on creating container %q from image %q: %v", name, cb.imageInfo, err)
-			return
+			continue
 		}
 
 		// Stats calls must be stopped at the end of current iteration if streaming
@@ -247,6 +250,7 @@ func (cb *CustomBench) runThread(ctx context.Context, runner driver.Driver, dura
 			Timestamp: time.Now().UTC(),
 		}
 	}
+	log.Infof("runThread end. threadNum: %d, time cost: %.2f", threadNum, time.Now().Sub(timeStart).Seconds())
 }
 
 // Stats returns the statistics of the benchmark run
