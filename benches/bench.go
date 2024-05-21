@@ -40,15 +40,18 @@ type Benchmark struct {
 // DriverConfig contains the YAML-defined parameters for running a
 // benchmark against a specific driver type
 type DriverConfig struct {
-	Type             string
-	ClientPath       string // optional path to specific client binary/socket
-	Threads          int
-	Iterations       int
+	Type       string
+	ClientPath string // optional path to specific client binary/socket
+	Threads    int
+	Iterations int
+	// Duration 表示压测的时长，与 Iterations 配合使用，如果运行了 Duration 之后 Iterations 还没执行完，则剩下的轮次记作失败不再执行。
+	Duration         time.Duration     `json:"duration"`
 	LogDriver        string            `yaml:"logDriver"`
 	LogOpts          map[string]string `yaml:"logOpts"`
 	CGroupPath       string            `yaml:"cgroupPath"`
 	StreamStats      bool              `yaml:"streamStats"`
 	StatsIntervalSec int               `yaml:"statsIntervalSec"`
+	Extended         any               `yaml:"extended"`
 }
 
 // State constants
@@ -85,7 +88,7 @@ type Bench interface {
 	// Run executes the specified # of iterations against a specified # of
 	// threads per benchmark against a specific engine driver type and collects
 	// the statistics of each iteration and thread
-	Run(ctx context.Context, threads, iterations int, commands []string) error
+	Run(ctx context.Context, threads, iterations int, duration time.Duration, commands []string) error
 
 	// Stats returns the statistics of the benchmark run
 	Stats() []RunStatistics

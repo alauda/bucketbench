@@ -17,6 +17,7 @@ import (
 	"github.com/estesp/bucketbench/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -337,6 +338,11 @@ func (r *ContainerdDriver) Run(ctx context.Context, ctr Container) (string, time
 		return "", 0, err
 	}
 	elapsed := time.Since(start)
+
+	if sleep, ok := ctx.Value("sleep").(int64); ok {
+		time.Sleep(time.Duration(sleep) * time.Second)
+	}
+
 	return stdouterr.String(), elapsed, nil
 }
 
@@ -389,21 +395,30 @@ func (r *ContainerdDriver) Remove(ctx context.Context, ctr Container) (string, t
 func (r *ContainerdDriver) Pause(ctx context.Context, ctr Container) (string, time.Duration, error) {
 	start := time.Now()
 	ctx = namespaces.WithNamespace(ctx, containerdNamespace)
+	// sleep one second before pause a container
+	time.Sleep(time.Second)
+	newCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+	err := wait.PollUntilWithContext(newCtx, time.Microsecond*10, func(ctx context.Context) (done bool, err error) {
+		container, err := r.client.LoadContainer(ctx, ctr.Name())
+		if err != nil {
+			return true, err
+		}
+		task, err := container.Task(ctx, nil)
+		if err != nil {
+			return true, err
+		}
+		err = task.Pause(ctx)
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
 
-	container, err := r.client.LoadContainer(ctx, ctr.Name())
 	if err != nil {
 		return "", 0, err
 	}
-	task, err := container.Task(ctx, nil)
-	if err != nil {
-		return "", 0, err
-	}
-	err = task.Pause(ctx)
-	if err != nil {
-		return "", 0, err
-	}
-	elapsed := time.Since(start)
-	return "", elapsed, nil
+	return "", time.Since(start), nil
 }
 
 // Unpause will unpause/resume a container
@@ -508,3 +523,4 @@ func stopTask(ctx context.Context, ctr containerd.Container) error {
 	}
 	return nil
 }
+

@@ -18,7 +18,6 @@ func NewPSUtilSampler(proc Process) (*PSUtilSampler, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get root process pid")
 	}
-
 	daemonProc, err := utils.NewProcFromPID(pid, proc.ProcNames())
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create process from pid: %d", pid)
