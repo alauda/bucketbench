@@ -274,9 +274,9 @@ func (r *ContainerdDriver) Create(ctx context.Context, name, image, cmdOverride 
 // Clean will clean the environment; removing any remaining containers in the runc metadata
 func (r *ContainerdDriver) Clean(ctx context.Context) error {
 	ctx = namespaces.WithNamespace(ctx, containerdNamespace)
-
+	filters := []string{fmt.Sprintf("id~=%s", ContainerNamePrefix)}
 	var tries int
-	list, err := r.client.Containers(ctx)
+	list, err := r.client.Containers(ctx, filters...)
 	if err != nil {
 		return fmt.Errorf("Error getting containerd list output: %v", err)
 	}
@@ -286,6 +286,7 @@ func (r *ContainerdDriver) Clean(ctx context.Context) error {
 		log.Infof("containerd cleanup: Pass #%d", tries+1)
 		// kill/stop and remove containers
 		for _, ctr := range list {
+			ctr.ID()
 			if err := stopTask(ctx, ctr); err != nil {
 				log.Errorf("Error stopping container: %v", err)
 			}
@@ -294,7 +295,7 @@ func (r *ContainerdDriver) Clean(ctx context.Context) error {
 			}
 		}
 		tries++
-		list, err = r.client.Containers(ctx)
+		list, err = r.client.Containers(ctx, filters...)
 		if err != nil {
 			return fmt.Errorf("Error getting containerd list output: %v", err)
 		}
@@ -497,7 +498,7 @@ func stopTask(ctx context.Context, ctr containerd.Container) error {
 		if err != nil {
 			return err
 		}
-	case containerd.Running:
+	case containerd.Created, containerd.Running:
 		statusC, err := task.Wait(ctx)
 		if err != nil {
 			log.Errorf("container %q: error during wait: %v", ctr.ID(), err)
@@ -523,4 +524,3 @@ func stopTask(ctx context.Context, ctr containerd.Container) error {
 	}
 	return nil
 }
-

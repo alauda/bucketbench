@@ -11,7 +11,7 @@ import (
 type Type int
 
 // ContainerNamePrefix represents containers name prefix
-const ContainerNamePrefix = "bb-ctr"
+var ContainerNamePrefix = "bb-ctr"
 
 const (
 	// DockerCLI represents the Docker CLI driver implementation

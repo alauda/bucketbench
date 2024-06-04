@@ -40,11 +40,12 @@ const (
 )
 
 var (
-	yamlFile  string
-	trace     bool
-	skipLimit bool
-	overhead  bool
-	legacy    bool
+	yamlFile            string
+	trace               bool
+	skipLimit           bool
+	overhead            bool
+	legacy              bool
+	containerNamePrefix string
 )
 
 // simple structure to handle collecting output data which will be displayed
@@ -90,6 +91,7 @@ iterations and number of concurrent threads. Results will be displayed afterward
 			}
 		}()
 
+		driver.ContainerNamePrefix = containerNamePrefix
 		if yamlFile == "" {
 			return fmt.Errorf("No YAML file provided with --benchmark/-b; nothing to do")
 		}
@@ -620,4 +622,5 @@ func init() {
 	runCmd.PersistentFlags().BoolVarP(&skipLimit, "skip-limit", "s", false, "Skip 'limit' benchmark run")
 	runCmd.PersistentFlags().BoolVarP(&overhead, "overhead", "o", false, "Output daemon overhead")
 	runCmd.PersistentFlags().BoolVarP(&legacy, "legacy", "l", false, "legacy mode will run benchmark from 1 to N(thread number) iterations.")
+	runCmd.PersistentFlags().StringVarP(&containerNamePrefix, "containerNamePrefix", "p", "bb-ctr", "prefix of container name")
 }
